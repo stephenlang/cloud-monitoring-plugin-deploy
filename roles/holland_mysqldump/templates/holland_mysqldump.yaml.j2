@@ -1,5 +1,5 @@
 type        : agent.plugin
-label       : '[AGENT] Holland mysqldump'
+label       : '[AGENT] Holland'
 disabled    : false
 period      : 60
 timeout     : 30
@@ -7,22 +7,56 @@ details     :
     file    : holland_mysqldump.py
 alarms      :
     alarm1  :
-        label                 : '[AGENT] Holland mysqldump'
-        notification_plan_id  : {{notification_plan}} 
+        label                 : '[AGENT] Holland Log'
+        notification_plan_id  : npManaged 
         criteria              : |
-          if (metric['sql_ping_succeeds'] == 'false') { 
-            return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL is not running.'); 
-          } 
-          if (metric['sql_creds_exist'] == 'false') { 
-            return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL credentials file does not exist.'); 
-          } 
-          if (metric['sql_status_succeeds'] == 'false') { 
-            return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL credentials do not authenticate.'); 
-          } 
-          if (metric['dump_age'] > 172800) { 
-            return new AlarmStatus(CRITICAL, 'holland-plugin: mysqldump file is older than 2d.'); 
-          } 
-          if (metric['error_count'] > 0) { 
-            return new AlarmStatus(CRITICAL, 'holland-plugin: #{last_error}.'); 
-          } 
-          return new AlarmStatus(OK, 'holland-plugin: MySQL and Holland OK'); 
+            if (metric['sql_ping_succeeds'] == 'true' && 
+                metric['sql_creds_exist'] == 'true' && 
+                metric['sql_status_succeeds'] == 'true' && 
+                metric['dump_age'] < 172800 && 
+                metric['error_count'] > 0) { 
+                return new AlarmStatus(CRITICAL, 'holland-plugin: #{last_error}.'); 
+            } 
+            return new AlarmStatus(OK, 'holland-plugin: No errors found in most recent log entries.');
+
+    alarm2  :
+        label                 : '[AGENT] MySQL Authenticates'
+        notification_plan_id  : npManaged
+        criteria              : |
+            if (metric['sql_ping_succeeds'] == 'true' && 
+                metric['sql_creds_exist'] == 'true' && 
+                metric['sql_status_succeeds'] == 'false') { 
+                return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL credentials do not authenticate.'); 
+            } 
+            return new AlarmStatus(OK, 'holland-plugin: MySQL credentials authenticate.');
+
+    alarm3  :
+        label                 : '[AGENT] MySQL Credentials Exist'
+        notification_plan_id  : npManaged
+        criteria              : |
+            if (metric['sql_ping_succeeds'] == 'true' && 
+                metric['sql_creds_exist'] == 'false') { 
+                return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL credentials file does not exist.'); 
+            } 
+            return new AlarmStatus(OK, 'holland-plugin: MySQL credentials file exists.');
+
+    alarm4  :
+        label                 : '[AGENT] MySQL Running'
+        notification_plan_id  : npManaged
+        criteria              : |
+            if (metric['sql_ping_succeeds'] == 'false') { 
+                return new AlarmStatus(CRITICAL, 'holland-plugin: MySQL is not running.'); 
+            } 
+            return new AlarmStatus(OK, 'holland-plugin: MySQL is running');
+
+    alarm5  :
+        label                 : '[AGENT] Recent Backup Exists'
+        notification_plan_id  : npManaged
+        criteria              : |
+            if (metric['sql_ping_succeeds'] == 'true' && 
+                metric['sql_creds_exist'] == 'true' && 
+                metric['sql_status_succeeds'] == 'true' && 
+                metric['dump_age'] > 172800) { 
+                return new AlarmStatus(CRITICAL, 'holland-plugin: mysqldump file is older than 2d.'); 
+            } 
+            return new AlarmStatus(OK, 'holland-plugin: mysqldump file age is less than 2d.');
